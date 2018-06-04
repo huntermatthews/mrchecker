@@ -1,0 +1,185 @@
+#!/usr/bin/python
+
+""" rmrchecker main program.
+
+Auto probes hardware, determines the configuration, and tells you if your
+raid's are healthy.
+
+Copyright (c) 2010 Hunter Matthews
+
+"""
+
+__author_name__ = 'Hunter Matthews'
+__author_email__ = 'hunter@pobox.com'
+__author__ = '%s <%s>' % (__author_name__, __author_email__)
+__copyright__ = '2010 Hunter Matthews'
+__license__ = 'UNKNOWN'
+__url__ = 'UNKNOWN'
+__version__ = '1.0'
+
+
+import sys
+from pprint import pprint
+from optparse import OptionParser
+import os.path
+import logging
+
+__program__ = os.path.basename(sys.argv[0])
+
+from raid_check import threeware, areca, megaraid, linuxsw, zpool
+from raid_check.csysloghandler import CSysLogHandler
+
+def setup_cmdline_parser():
+    parser = OptionParser(usage='usage: %prog [--areca|--3ware|--megaraid|--linuxsw|--zpool] [options]', 
+                          version='%%prog v%s' % __version__, prog=__program__)
+
+    # What to do
+    parser.add_option("--check-all", action="store_true", default=False,
+                      dest="check_all", help="run all available checks")
+    parser.add_option("--dump-details", action="store_true", default=False,
+                      dest="dump_details", help="print the raid detail data structure (debug)")
+
+    # Where to do it (output options)
+    parser.add_option("--syslog", action="store_true", default=False,
+                      dest="syslog", help="output status to syslog [NOT COMPATIBLE WITH DUMP OPTIONS]")
+    parser.add_option("--verbose", action="store_true", default=False,
+                      dest="verbose", help="be more verbose in output.")
+    parser.add_option("--debug", action="store_true", default=False,
+                      dest="debug", help="Debug information - for program development.")
+
+    # Backend options
+    parser.add_option("--program", action="store", default=None,
+                      dest="program", help="override location of the backend program")
+    parser.add_option("--areca", action="store_true", dest='areca', 
+                      help="talk to areca type controllers")
+    parser.add_option("--3ware", action="store_true", dest='threeware', 
+                      help="talk to 3ware type controllers")
+    parser.add_option("--megaraid", action="store_true", dest='megaraid', 
+                      help="talk to megaraid type controllers")
+    parser.add_option("--linuxsw", action="store_true", dest='linuxsw', 
+                      help="talk to linux software raids")
+    parser.add_option("--zpool", action="store_true", dest='zpool', 
+                      help="talk to zpool software raids")
+
+    # Aliases / shortcuts for other options and combos of other options
+    parser.add_option("--cron", action="store_true", default=False,
+                      dest="cron", help="shortcut of --syslog --check-all")
+
+    return parser
+    
+
+def setup_logging(options):
+    ## Pythons logging module is a bit too complex for my taste
+    if options.syslog:
+        # Double sigh - pythons logging module does the wrong thing with syslog on non-linux
+        # And I'd argue it does the wrong thing on linux...
+        hdlr = CSysLogHandler(ident='raid_check')
+    else:
+        hdlr = logging.StreamHandler(sys.stdout)
+    rootlog = logging.getLogger('')
+    format = '%(levelname)s %(name)s %(message)s'
+    frmtr = logging.Formatter(format)
+    hdlr.setFormatter(frmtr)
+    rootlog.addHandler(hdlr)
+    logging.addLevelName(5, 'trace')
+    if options.verbose:
+        rootlog.setLevel(logging.INFO)
+    elif options.debug:
+        rootlog.setLevel(logging.DEBUG)
+    else:
+        rootlog.setLevel(logging.WARNING)
+
+    return logging.getLogger('main')
+
+
+def main(argv):
+
+    # rc 0 = everything fine
+    # rc 1 = command line problem (bad user input)
+    # rc 2 = can't find needed tool (tw_cli or similar)
+    # rc 3..9 = undefined
+    # rc 10 = quick check error
+    # rc 11 =
+    # optimism
+    rc = 0
+
+    #
+    # Early setup steps - used to be in main, own functions to tidy main() now.
+    #
+    parser = setup_cmdline_parser()
+    (options, args) = parser.parse_args()
+
+    if options.cron:
+        options.syslog = True
+        options.check_all = True
+        options.verbose = True
+
+    if options.syslog and options.dump_details:
+        sys.stderr.write('ERROR: --syslog incompatible with --dump-* options.\n\n')
+        parser.print_help()
+        rc = 1 
+        return rc
+
+    # Setup the logging operation
+    log = setup_logging(options)
+
+    # Create a list of backend objects to run against
+    backends = list()
+    if options.areca:
+        backends.append(areca.Areca(options.program))
+    if options.threeware:
+        backends.append(threeware.Threeware(options.program))
+    if options.megaraid:
+        backends.append(megaraid.MegaRaid(options.program))
+    if options.linuxsw:
+        backends.append(linuxsw.LinuxSW(options.program))
+    if options.zpool:
+        backends.append(zpool.ZPool(options.program))
+
+    if len(backends) == 0:
+        sys.stderr.write('ERROR: You must specify one or more controller types to check '
+                         '[--areca|3ware|etc]\n\n')
+        parser.print_help()
+        rc = 1
+        return rc
+
+    # Log that we are starting - needed for easy SEC parsing on the syslog server.
+    log.info('%s v%s starting %s' % (__program__, __version__, argv))
+
+    for backend in backends:
+        # Setup the backend controller object
+        if not backend.setup():
+            # Error setting up the backend - quit early
+            rc = 2
+            return rc
+
+        if options.check_all:
+            rc = backend.check_all()
+            if rc == 0:
+                log.info('check_all(%s) completed with no warnings or errors.' % backend.name)
+            else:
+                log.info('check_all(%s) detected one or more problems.' % backend.name)
+
+        if options.dump_details:
+            pprint(backend.dump_details())
+
+        # Shutdown the backend controller object
+        backend.teardown()
+
+    #
+    # Close out the program.
+    # 
+
+    # Shutdown the logging subsystem
+    log.info('%s v%s ending' % (__program__, __version__))
+    logging.shutdown()
+
+    return rc
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
+
+
+## END OF LINE ##
+

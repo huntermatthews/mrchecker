@@ -1,0 +1,60 @@
+
+mrchecker
+----------
+
+A portable (linux and opensolaris at least) pure python raid health checking script.
+
+Each manufacturer of raid cards seems to have their own goofy command line program to monitor
+their brand of card - but they're all different (very) and inconsistent. What was wanted was 
+a common interface. raid-check provides that. 
+
+Some raid cards (and linux software raid) provide their own monitoring structures - but being all
+different, require custom configs. And the areca needs additional network ports to work.
+This script abstracts all that away, AND when possible determines other useful info like the 
+serial numbers of the drives (when the info is available from the raid tool).
+
+
+Requirements:
+You need python 2.4 (2.4 was chosen as the shipping version in both rhel/centos-5 and opensolaris 2009.06)
+and the appropriate command line tool for your raid card. [which I should document here]
+
+Python 2.3 doesn't include subprocess. I haven't yet tried 2.3 + subprocess. There may be other missing deps.
+
+
+Supported Cards:
+1.0 support 3ware cards using tw_cli, 3 different models of areca controllers with cli64 or cli32, and 
+megaraid cards using the horrific MegaCli program.
+
+Additional models of areca should be fairly straightforward to support. 
+
+
+Usage:
+for interactive use:
+raid-check --type [--check-all] [--dump-details] [--verbose] [--debug] [--syslog]
+
+for automated (cron job) use:
+raid-check --type --cron
+
+--cron turns syslogging and check-all options on, and everything else off.
+--type is one (and only one) of --3ware or --areca or --megaraid.
+
+
+License:
+None yet. (BSD, Apache or GPL will be chosen)
+
+
+Future Improvements:
+1. Linux software raid (in development) might also include lvm to match zpool/zfs functionality.
+2. Opensolaris Zpool/zfs  
+3. LSI cards using cfggen
+4. Adaptec aacraid
+5. Autoprobe the type of cards available from lspci or scanpci output.
+
+
+Bug Reports:
+Please send bug reports including relevant details to 
+Hunter Matthews <hunter@pobox.com>
+
+
+14Jun2010
+

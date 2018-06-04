@@ -1,0 +1,43 @@
+Interesting snippets for setup.py
+
+
+# Make sure I have the right Python version.
+if sys.version_info[:2] < (2, 4):
+    print "Biopython requires Python 2.4 or better.  Python %d.%d detected" % \
+          sys.version_info[:2]
+    sys.exit(-1)
+
+OTHER STUFF HERE
+
+#We now define the Biopython version number in Bio/__init__.py
+#Here we can't use "import Bio" then "Bio.__version__" as that would
+#tell us the version of Biopython already installed (if any).
+__version__ = "Undefined"
+for line in open('Bio/__init__.py'):
+    if (line.startswith('__version__')):
+        exec(line.strip())
+
+setup(
+    name='biopython',
+    version=__version__,
+    ETC
+
+=====================================================================================================
+--- bdist_rpm.py.xxx    2007-10-25 15:28:48.000000000 +0300
++++ bdist_rpm.py        2007-10-25 15:36:21.000000000 +0300
+@@ -493,6 +493,7 @@
+             ('build', 'build_script', def_build),
+             ('install', 'install_script',
+              ("%s install "
++              "-O1 "
+               "--root=$RPM_BUILD_ROOT "
+               "--record=INSTALLED_FILES") % def_setup_call),
+             ('clean', 'clean_script', "rm -rf $RPM_BUILD_ROOT"),
+
+------------------------------------------------------------------------------------------------------
+OR
+[install]
+optimize=1
+
+in setup.cfg may do the same thing. Maybe
+=====================================================================================================

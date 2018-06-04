@@ -1,0 +1,6 @@
+include lib/*
+include scripts/*
+include README
+include Makefile
+include packaging/*
+include setup.*
