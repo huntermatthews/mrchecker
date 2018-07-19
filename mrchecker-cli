@@ -1,19 +1,17 @@
 #!/usr/bin/python
 
-""" rmrchecker main program.
+""" mrchecker main program.
 
 Auto probes hardware, determines the configuration, and tells you if your
 raid's are healthy.
-
-Copyright (c) 2010 Hunter Matthews
 
 """
 
 __author_name__ = 'Hunter Matthews'
 __author_email__ = 'hunter@pobox.com'
 __author__ = '%s <%s>' % (__author_name__, __author_email__)
-__copyright__ = '2010 Hunter Matthews'
-__license__ = 'UNKNOWN'
+__copyright__ = '2018 Hunter Matthews'
+__license__ = 'GPL v3'
 __url__ = 'UNKNOWN'
 __version__ = '1.0'
 
